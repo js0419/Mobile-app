@@ -14,11 +14,11 @@ class _UserManagementPageState extends State<UserManagementPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Admin Dashboard'),
+        title: const Text('User Management'),
       ),
       drawer: const AdminDrawer(),
       body: const Center(
-        child: Text('Welcome, Admin'),
+
       ),
     );
   }

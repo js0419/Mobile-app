@@ -38,12 +38,16 @@ class _LoginPageState extends State<LoginPage> {
         email: email,
         password: password,
       );
-    } on AuthException catch (e) {
 
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+         MaterialPageRoute(builder: (BuildContext context) => const AuthWrapper()),
+      );
+
+    } on AuthException catch (e) {
       await Supabase.instance.client.auth.signOut();
 
       if (e.message.toLowerCase().contains('invalid login credentials')) {
-
         final data = await Supabase.instance.client
             .from('user')
             .select('user_email')
@@ -51,10 +55,8 @@ class _LoginPageState extends State<LoginPage> {
             .maybeSingle();
 
         if (data == null) {
-
           _showError('This email is not registered. Please sign up first.');
         } else {
-
           _showError(
             'This email is linked to a Google account. Please sign in with Google.',
           );
@@ -70,8 +72,6 @@ class _LoginPageState extends State<LoginPage> {
       SnackBar(content: Text(message)),
     );
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -244,9 +244,9 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               onPressed: () async{
                                 await UserService.signInWithGoogle();
-                                Navigator.of(context).pushAndRemoveUntil(
+                                Navigator.of(context).push(
                                   MaterialPageRoute(builder: (_) => const AuthWrapper()),
-                                      (route) => false,
+
                                 );
 
                               },

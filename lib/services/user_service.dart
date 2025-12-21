@@ -53,6 +53,17 @@ class UserService {
     }
   }
 
+  static Future<List<Map<String, dynamic>>> fetchAllUsers() async {
+    final response = await _supabase
+        .from('user')
+        .select(
+      'user_name, user_email, user_gender, user_status, user_type, created_at',
+    )
+        .order('created_at');
+
+    return List<Map<String, dynamic>>.from(response);
+  }
+
   static Future<void> logout() async {
     await Supabase.instance.client.auth.signOut();
   }

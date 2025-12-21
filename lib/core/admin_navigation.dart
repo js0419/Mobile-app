@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tikwei_assignment/modules/admin/user_management.dart';
 import '../services/user_service.dart';
 import '../modules/user/start_page.dart';
 
@@ -39,12 +40,14 @@ class AdminDrawer extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.people),
-            title: const Text('User Management'),
+            title: const Text('User'),
             onTap: () {
-              Navigator.pushReplacementNamed(context, '/user-management');
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (BuildContext context) => const UserManagementPage()),
+              );
             },
           ),
-          const Spacer(),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),
             title: const Text(
@@ -55,7 +58,7 @@ class AdminDrawer extends StatelessWidget {
               await UserService.logout();
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const StartPage()),
+                MaterialPageRoute(builder: (BuildContext context) => const StartPage()),
               );
             },
           ),

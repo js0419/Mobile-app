@@ -33,6 +33,14 @@ class HomePage extends StatelessWidget{
                 },
                 child: const Text('Profile Page'),
               ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.video_library),
+                label: const Text('Access Resources'),
+                onPressed: () {
+                  Navigator.pushNamed(context, '/resources');
+                },
+              ),
             ],
           ),
         ),
