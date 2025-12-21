@@ -5,7 +5,7 @@ final _sb = Supabase.instance.client;
 class ResourceDto {
   final int id;
   final String title;
-  final String? summary;
+  final String?  summary;
   final String contentType;
   final List<String> tags;
   final bool isPublished;
@@ -15,7 +15,7 @@ class ResourceDto {
 
   ResourceDto({
     required this.id,
-    required this.title,
+    required this. title,
     required this.contentType,
     required this.isPublished,
     this.summary,
@@ -28,15 +28,16 @@ class ResourceDto {
   factory ResourceDto.fromMap(Map<String, dynamic> map) {
     return ResourceDto(
       id: map['resource_id'] as int,
-      title: map['title'] ?? '',
+      title: map['title'] ??  '',
       summary: map['summary'],
       contentType: map['content_type'] ?? '',
       tags: _coerceTags(map['tags']),
       isPublished: map['is_published'] ?? false,
-      categoryName: map['category']?['name'],
-      categoryId: map['category']?['category_id'],
-      content: map['content'] != null
-          ? ResourceContent.fromMap(map['content'])
+      categoryName: map['category']? ['name'],
+      categoryId:  map['category']?['category_id'],
+      content: map['content'] != null && (map['content'] as List).isNotEmpty
+          ? ResourceContent.fromMap(
+          (map['content'] as List)[0] as Map<String, dynamic>)
           : null,
     );
   }
@@ -59,14 +60,14 @@ class ResourceContent {
   final String? videoUrl;
   final String? articleBody;
   final String? externalLink;
-  final String? contactName;
+  final String?  contactName;
   final String? contactEmail;
   final String? contactPhone;
   final String? officeLocation;
   final String? officeHours;
 
   ResourceContent({
-    this.videoUrl,
+    this. videoUrl,
     this.articleBody,
     this.externalLink,
     this.contactName,
@@ -78,26 +79,26 @@ class ResourceContent {
 
   factory ResourceContent.fromMap(Map<String, dynamic> map) {
     return ResourceContent(
-      videoUrl: map['video_url'],
+      videoUrl:  map['video_url'],
       articleBody: map['article_body'],
       externalLink: map['external_link'],
       contactName: map['contact_name'],
       contactEmail: map['contact_email'],
-      contactPhone: map['contact_phone'],
+      contactPhone:  map['contact_phone'],
       officeLocation: map['office_location'],
       officeHours: map['office_hours'],
     );
   }
 
   Map<String, dynamic> toJson() => {
-    'video_url': videoUrl,
+    'video_url':  videoUrl,
     'article_body': articleBody,
     'external_link': externalLink,
     'contact_name': contactName,
     'contact_email': contactEmail,
     'contact_phone': contactPhone,
     'office_location': officeLocation,
-    'office_hours': officeHours,
+    'office_hours':  officeHours,
   };
 }
 
@@ -108,15 +109,14 @@ class ResourceService {
       throw Exception('Not authenticated');
     }
     final data = await _sb
-        .from('user')
+        .from('"user"')
         .select('user_id, user_email')
         .order('user_id')
         .limit(500);
     final row = (data as List)
         .cast<Map<String, dynamic>>()
-        .firstWhere((e) => e['user_email'] == user.email,
-        orElse: () => {});
-    if (row.isEmpty) throw Exception('User not found in table');
+        .firstWhere((e) => e['user_email'] == user.email, orElse: () => {});
+    if (row. isEmpty) throw Exception('User not found in table');
     return row['user_id'] as int;
   }
 
@@ -125,156 +125,267 @@ class ResourceService {
     String? search,
     String? tag,
   }) async {
-    final data = await _sb
-        .from('resource')
-        .select('''
-          resource_id, category_id, title, summary, content_type, tags, is_published, deleted_at,
-          category:resourceCategory(category_id, name),
-          content:resourceContent(
-            video_url, article_body, external_link,
-            contact_name, contact_email, contact_phone,
-            office_location, office_hours
-          )
-        ''')
-        .order('created_at', ascending: false);
+    try {
+      print('========== FETCH PUBLISHED START ==========');
+      print('Query Parameters:');
+      print('  categoryId: $categoryId');
+      print('  search: $search');
+      print('  tag:  $tag');
 
-    String q = (search ?? '').toLowerCase();
-    String t = (tag ?? '').toLowerCase();
+      // Step 1: Fetch all data
+      print('\n📡 Fetching from database...');
+      final data = await _sb
+          .from('"resource"')
+          .select('''
+            resource_id, category_id, title, summary, content_type, tags, is_published, deleted_at,
+            category:"resourceCategory"(category_id, name),
+            content:"resourceContent"(
+              video_url, article_body, external_link,
+              contact_name, contact_email, contact_phone,
+              office_location, office_hours
+            )
+          ''');
 
-    return (data as List)
-        .where((e) => (e['is_published'] ?? false) == true && e['deleted_at'] == null)
-        .where((e) => categoryId == null || e['category_id'] == categoryId)
-        .where((e) {
-      if (q.isEmpty) return true;
-      final title = (e['title'] ?? '').toString().toLowerCase();
-      final summary = (e['summary'] ?? '').toString().toLowerCase();
-      final tags = ResourceDto._coerceTags(e['tags'])
-          .map((s) => s.toLowerCase())
-          .join(' ');
-      return title.contains(q) || summary.contains(q) || tags.contains(q);
-    })
-        .where((e) {
-      if (t.isEmpty) return true;
-      final tags = ResourceDto._coerceTags(e['tags'])
-          .map((s) => s.toLowerCase())
-          .toList();
-      return tags.contains(t);
-    })
-        .map((e) => ResourceDto.fromMap(e))
-        .toList();
+      print('✅ Raw data count: ${(data as List).length}');
+      if ((data as List).isNotEmpty) {
+        print('First item: ${data[0]}');
+      } else {
+        print('❌ NO DATA RETURNED FROM DATABASE! ');
+      }
+
+      // Step 2: Filter is_published
+      print('\n🔍 Filter 1: is_published = true');
+      final publishedData = (data as List).where((e) {
+        final isPublished = e['is_published'] ?? false;
+        print('  Resource ${e['resource_id']}: is_published = $isPublished');
+        return isPublished == true;
+      }).toList();
+      print('After is_published filter: ${publishedData.length} items');
+
+      // Step 3: Filter deleted_at
+      print('\n🔍 Filter 2: deleted_at is NULL');
+      final notDeletedData = publishedData.where((e) {
+        final deletedAt = e['deleted_at'];
+        final isNotDeleted = deletedAt == null;
+        print('  Resource ${e['resource_id']}: deleted_at = $deletedAt, kept = $isNotDeleted');
+        return isNotDeleted;
+      }).toList();
+      print('After deleted_at filter: ${notDeletedData.length} items');
+
+      // Step 4: Filter by category
+      print('\n🔍 Filter 3: category_id = $categoryId');
+      final categoryFiltered = categoryId == null
+          ? notDeletedData
+          : notDeletedData. where((e) {
+        final catId = e['category_id'];
+        final match = catId == categoryId;
+        print('  Resource ${e['resource_id']}: category_id = $catId, match = $match');
+        return match;
+      }).toList();
+      print('After category filter: ${categoryFiltered.length} items');
+
+      // Step 5: Filter by search
+      print('\n🔍 Filter 4: search = "$search"');
+      String q = (search ?? '').toLowerCase();
+      final searchFiltered = q.isEmpty
+          ? categoryFiltered
+          : categoryFiltered.where((e) {
+        final title = (e['title'] ?? '').toString().toLowerCase();
+        final summary = (e['summary'] ?? '').toString().toLowerCase();
+        final tags = ResourceDto._coerceTags(e['tags'])
+            .map((s) => s.toLowerCase())
+            .join(' ');
+        final matches = title.contains(q) ||
+            summary.contains(q) ||
+            tags.contains(q);
+        print('  Resource ${e['resource_id']}: "$title" matches = $matches');
+        return matches;
+      }).toList();
+      print('After search filter: ${searchFiltered.length} items');
+
+      // Step 6: Filter by tag
+      print('\n🔍 Filter 5: tag = "$tag"');
+      String t = (tag ?? '').toLowerCase();
+      final tagFiltered = t.isEmpty
+          ? searchFiltered
+          : searchFiltered. where((e) {
+        final tags = ResourceDto._coerceTags(e['tags'])
+            .map((s) => s.toLowerCase())
+            .toList();
+        final matches = tags.contains(t);
+        print('  Resource ${e['resource_id']}: tags = $tags, matches = $matches');
+        return matches;
+      }).toList();
+      print('After tag filter: ${tagFiltered.length} items');
+
+      // Step 7: Convert to DTO
+      print('\n🔄 Converting to ResourceDto...');
+      final result = tagFiltered.map((e) {
+        try {
+          return ResourceDto.fromMap(e);
+        } catch (e) {
+          print('❌ Error converting resource: $e');
+          return null;
+        }
+      }).whereType<ResourceDto>().toList();
+
+      print('\n========== FETCH PUBLISHED END ==========');
+      print('✅ Final result:  ${result.length} items');
+      return result;
+    } catch (e, stackTrace) {
+      print('❌ ERROR in fetchPublished: $e');
+      print('Stack trace: $stackTrace');
+      return [];
+    }
   }
 
   static Future<ResourceDto?> fetchById(int id) async {
-    final data = await _sb
-        .from('resource')
-        .select('''
-          resource_id, category_id, title, summary, content_type, tags, is_published, deleted_at,
-          category:resourceCategory(category_id, name),
-          content:resourceContent(
-            video_url, article_body, external_link,
-            contact_name, contact_email, contact_phone,
-            office_location, office_hours
-          )
-        ''');
+    try {
+      final data = await _sb
+          . from('"resource"')
+          .select('''
+            resource_id, category_id, title, summary, content_type, tags, is_published, deleted_at,
+            category:"resourceCategory"(category_id, name),
+            content:"resourceContent"(
+              video_url, article_body, external_link,
+              contact_name, contact_email, contact_phone,
+              office_location, office_hours
+            )
+          ''')
+          .eq('is_published', true)
+          .order('created_at', ascending:  false);
 
-    final list = (data as List)
-        .where((e) => e['deleted_at'] == null)
-        .where((e) => e['resource_id'] == id)
-        .map((e) => ResourceDto.fromMap(e))
-        .toList();
-    if (list.isEmpty) return null;
-    return list.first;
+      final list = (data as List)
+          .where((e) => e['deleted_at'] == null)
+          .where((e) => e['resource_id'] == id)
+          .map((e) => ResourceDto.fromMap(e))
+          .toList();
+      if (list.isEmpty) return null;
+      return list. first;
+    } catch (e) {
+      print('Error fetching resource by id: $e');
+      return null;
+    }
   }
 
   // Favorites
   static Future<Set<int>> fetchFavoriteIds() async {
-    final uid = await _currentUserId();
-    final data = await _sb
-        .from('resource_favorites')
-        .select('user_id, resource_id')
-        .order('created_at', ascending: false);
-    return (data as List)
-        .cast<Map<String, dynamic>>()
-        .where((e) => e['user_id'] == uid)
-        .map<int>((e) => e['resource_id'] as int)
-        .toSet();
+    try {
+      final uid = await _currentUserId();
+      final data = await _sb
+          . from('"resource_favorites"')
+          .select('user_id, resource_id')
+          .eq('user_id', uid)
+          .order('created_at', ascending: false);
+      return (data as List)
+          .cast<Map<String, dynamic>>()
+          .map<int>((e) => e['resource_id'] as int)
+          .toSet();
+    } catch (e) {
+      print('Error fetching favorite ids: $e');
+      return {};
+    }
   }
 
   static Future<void> toggleFavorite(int resourceId, bool shouldBeFav) async {
-    final uid = await _currentUserId();
-    if (shouldBeFav) {
-      await _sb.from('resource_favorites').upsert({
-        'user_id': uid,
-        'resource_id': resourceId,
-        'created_at': DateTime.now().toUtc().toIso8601String(),
-      }, onConflict: 'user_id,resource_id');
-    } else {
-      await _sb
-          .from('resource_favorites')
-          .delete()
-          .match({'user_id': uid, 'resource_id': resourceId});
+    try {
+      final uid = await _currentUserId();
+      if (shouldBeFav) {
+        await _sb. from('"resource_favorites"').upsert({
+          'user_id': uid,
+          'resource_id':  resourceId,
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+        }, onConflict: 'user_id,resource_id');
+      } else {
+        await _sb
+            .from('"resource_favorites"')
+            .delete()
+            .match({'user_id': uid, 'resource_id': resourceId});
+      }
+    } catch (e) {
+      print('Error toggling favorite: $e');
     }
   }
 
   // Recently viewed
   static Future<void> recordView(int resourceId) async {
-    final uid = await _currentUserId();
-    await _sb.from('resource_recent').upsert({
-      'user_id': uid,
-      'resource_id': resourceId,
-      'viewed_at': DateTime.now().toUtc().toIso8601String(),
-    }, onConflict: 'user_id,resource_id');
+    try {
+      final uid = await _currentUserId();
+      await _sb.from('"resource_recent"').upsert({
+        'user_id': uid,
+        'resource_id': resourceId,
+        'viewed_at': DateTime.now().toUtc().toIso8601String(),
+      }, onConflict: 'user_id,resource_id');
+    } catch (e) {
+      print('Error recording view: $e');
+    }
   }
 
   static Future<List<ResourceDto>> fetchRecent({int limit = 10}) async {
-    final uid = await _currentUserId();
-    final recent = await _sb
-        .from('resource_recent')
-        .select('user_id, resource_id, viewed_at')
-        .order('viewed_at', ascending: false);
+    try {
+      final uid = await _currentUserId();
+      final recent = await _sb
+          .from('"resource_recent"')
+          .select('user_id, resource_id, viewed_at')
+          .eq('user_id', uid)
+          .order('viewed_at', ascending: false)
+          .limit(limit);
 
-    final ids = (recent as List)
-        .cast<Map<String, dynamic>>()
-        .where((e) => e['user_id'] == uid)
-        .map<int>((e) => e['resource_id'] as int)
-        .toList();
+      final ids = (recent as List)
+          .cast<Map<String, dynamic>>()
+          .map<int>((e) => e['resource_id'] as int)
+          .toList();
 
-    final limited = ids.take(limit).toList();
-    final results = <ResourceDto>[];
-    for (final id in limited) {
-      final r = await fetchById(id);
-      if (r != null) results.add(r);
+      final results = <ResourceDto>[];
+      for (final id in ids) {
+        final r = await fetchById(id);
+        if (r != null) results.add(r);
+      }
+      return results;
+    } catch (e) {
+      print('Error fetching recent:  $e');
+      return [];
     }
-    return results;
   }
 
   static Future<List<Map<String, dynamic>>> fetchCategories() async {
-    final data = await _sb
-        .from('resourceCategory')
-        .select('category_id, name')
-        .order('name');
-    return (data as List).cast<Map<String, dynamic>>();
+    try {
+      final data = await _sb
+          .from('"resourceCategory"')
+          .select('category_id, name')
+          .order('name');
+      print('✅ Fetched ${(data as List).length} categories');
+      return (data as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      print('Error fetching categories: $e');
+      return [];
+    }
   }
 
   // Admin helpers
   static Future<List<ResourceDto>> fetchAll({bool includeDeleted = false}) async {
-    final data = await _sb
-        .from('resource')
-        .select('''
-          resource_id, category_id, title, summary, content_type, tags, is_published, deleted_at,
-          category:resourceCategory(category_id, name),
-          content:resourceContent(
-            video_url, article_body, external_link,
-            contact_name, contact_email, contact_phone,
-            office_location, office_hours
-          )
-        ''')
-        .order('created_at', ascending: false);
+    try {
+      final data = await _sb
+          . from('"resource"')
+          .select('''
+            resource_id, category_id, title, summary, content_type, tags, is_published, deleted_at,
+            category:"resourceCategory"(category_id, name),
+            content:"resourceContent"(
+              video_url, article_body, external_link,
+              contact_name, contact_email, contact_phone,
+              office_location, office_hours
+            )
+          ''')
+          .order('created_at', ascending: false);
 
-    return (data as List)
-        .where((e) => includeDeleted || e['deleted_at'] == null)
-        .map((e) => ResourceDto.fromMap(e))
-        .toList();
+      return (data as List)
+          .where((e) => includeDeleted || e['deleted_at'] == null)
+          .map((e) => ResourceDto.fromMap(e))
+          .toList();
+    } catch (e) {
+      print('Error fetching all resources: $e');
+      return [];
+    }
   }
 
   static Future<void> upsertResource({
@@ -287,64 +398,76 @@ class ResourceService {
     bool isPublished = false,
     ResourceContent? content,
   }) async {
-    final payload = {
-      'category_id': categoryId,
-      'title': title,
-      'summary': summary,
-      'content_type': contentType,
-      'tags': tags?.join(','),
-      'is_published': isPublished,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-      if (resourceId == null) 'created_at': DateTime.now().toUtc().toIso8601String(),
-    };
+    try {
+      final payload = {
+        'category_id': categoryId,
+        'title': title,
+        'summary': summary,
+        'content_type': contentType,
+        'tags': tags?. join(','),
+        'is_published': isPublished,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+        if (resourceId == null)
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+      };
 
-    int id = resourceId ??
+      int id = resourceId ??
+          await _sb
+              .from('"resource"')
+              .insert(payload)
+              .select('resource_id')
+              .single()
+              .then((r) => r['resource_id'] as int);
+
+      if (resourceId != null) {
         await _sb
-            .from('resource')
-            .insert(payload)
-            .select('resource_id')
-            .single()
-            .then((r) => r['resource_id'] as int);
-
-    if (resourceId != null) {
-      await _sb.from('resource').update(payload).match({'resource_id': id});
-    }
-
-    if (content != null) {
-      final existing = await _sb
-          .from('resourceContent')
-          .select('content_id')
-          .match({'resource_id': id})
-          .maybeSingle();
-
-      if (existing == null) {
-        await _sb.from('resourceContent').insert({
-          'resource_id': id,
-          ...content.toJson(),
-        });
-      } else {
-        await _sb
-            .from('resourceContent')
-            .update(content.toJson())
+            .from('"resource"')
+            .update(payload)
             .match({'resource_id': id});
       }
+
+      if (content != null) {
+        final existing = await _sb
+            .from('"resourceContent"')
+            .select('content_id')
+            .match({'resource_id': id})
+            .maybeSingle();
+
+        if (existing == null) {
+          await _sb. from('"resourceContent"').insert({
+            'resource_id': id,
+            ... content. toJson(),
+          });
+        } else {
+          await _sb
+              .from('"resourceContent"')
+              .update(content.toJson())
+              .match({'resource_id': id});
+        }
+      }
+    } catch (e) {
+      print('Error upserting resource:  $e');
     }
   }
 
   static Future<void> setPublish(int id, bool publish) async {
-    await _sb
-        .from('resource')
-        .update({
-      'is_published': publish,
-      'updated_at': DateTime.now().toUtc().toIso8601String()
-    })
-        .match({'resource_id': id});
+    try {
+      await _sb. from('"resource"').update({
+        'is_published': publish,
+        'updated_at':  DateTime.now().toUtc().toIso8601String()
+      }).match({'resource_id': id});
+    } catch (e) {
+      print('Error setting publish: $e');
+    }
   }
 
   static Future<void> softDelete(int id) async {
-    await _sb
-        .from('resource')
-        .update({'deleted_at': DateTime.now().toUtc().toIso8601String()})
-        .match({'resource_id': id});
+    try {
+      await _sb.from('"resource"').update({
+        'deleted_at':  DateTime.now().toUtc().toIso8601String()
+      }).match({'resource_id': id});
+    } catch (e) {
+      print('Error deleting resource: $e');
+    }
   }
 }
