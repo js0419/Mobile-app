@@ -3,6 +3,7 @@ import 'core/auth_wrapper.dart';
 
 import 'modules/resources/resource_page.dart';
 import 'modules/resources/resource_detail_page.dart';
+import 'modules/resources/favorites_page.dart';
 import 'modules/admin/resource_admin_list.dart';
 import 'modules/admin/resource_admin_edit.dart';
 
@@ -22,6 +23,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/resources': (_) => const ResourcesPage(),
         '/resource-detail': (_) => const ResourceDetailPage(),
+        '/favorites': (_) => const FavoritesPage(),
         '/admin/resources': (_) => const ResourceAdminListPage(),
         '/admin/resources/edit': (_) => const ResourceAdminEditPage(),
       },

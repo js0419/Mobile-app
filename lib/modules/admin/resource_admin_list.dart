@@ -12,6 +12,7 @@ class ResourceAdminListPage extends StatefulWidget {
 class _ResourceAdminListPageState extends State<ResourceAdminListPage> {
   late Future<void> _future;
   List<ResourceDto> _items = [];
+  bool _loading = true;
 
   @override
   void initState() {
@@ -20,8 +21,71 @@ class _ResourceAdminListPageState extends State<ResourceAdminListPage> {
   }
 
   Future<void> _load() async {
-    _items = await ResourceService.fetchAll();
-    setState(() {});
+    setState(() => _loading = true);
+    try {
+      _items = await ResourceService.fetchAll();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Load failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _refresh() async {
+    _future = _load();
+    await _future;
+  }
+
+  Future<void> _togglePublish(ResourceDto r, bool val) async {
+    // optimistic update
+    setState(() {
+      final idx = _items.indexWhere((x) => x.id == r.id);
+      if (idx != -1) {
+        _items[idx] = ResourceDto(
+          id: r.id,
+          title: r.title,
+          contentType: r.contentType,
+          isPublished: val,
+          summary: r.summary,
+          tags: r.tags,
+          categoryName: r.categoryName,
+          categoryId: r.categoryId,
+          content: r.content,
+        );
+      }
+    });
+
+    try {
+      await ResourceService.setPublish(r.id, val);
+      await _refresh();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Update failed: $e')),
+        );
+      }
+      // revert on failure
+      setState(() {
+        final idx = _items.indexWhere((x) => x.id == r.id);
+        if (idx != -1) {
+          _items[idx] = ResourceDto(
+            id: r.id,
+            title: r.title,
+            contentType: r.contentType,
+            isPublished: r.isPublished,
+            summary: r.summary,
+            tags: r.tags,
+            categoryName: r.categoryName,
+            categoryId: r.categoryId,
+            content: r.content,
+          );
+        }
+      });
+    }
   }
 
   @override
@@ -31,60 +95,54 @@ class _ResourceAdminListPageState extends State<ResourceAdminListPage> {
       drawer: const AdminDrawer(),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          await Navigator.pushNamed(context, '/admin/resources/edit');
-          _future = _load();
+          final changed = await Navigator.pushNamed(context, '/admin/resources/edit');
+          if (changed == true) await _refresh();
         },
         child: const Icon(Icons.add),
       ),
       body: FutureBuilder(
         future: _future,
         builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
+          if (_loading || snap.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
           if (_items.isEmpty) return const Center(child: Text('No resources yet'));
-          return ListView.builder(
-            itemCount: _items.length,
-            itemBuilder: (context, i) {
-              final r = _items[i];
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                child: ListTile(
-                  title: Text(r.title),
-                  subtitle: Text('${r.categoryName ?? ''} • ${r.contentType}'),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Switch(
-                        value: r.isPublished,
-                        onChanged: (val) async {
-                          await ResourceService.setPublish(r.id, val);
-                          _future = _load();
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.edit),
-                        onPressed: () async {
-                          await Navigator.pushNamed(
-                            context,
-                            '/admin/resources/edit',
-                            arguments: r,
-                          );
-                          _future = _load();
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () async {
-                          await ResourceService.softDelete(r.id);
-                          _future = _load();
-                        },
-                      ),
-                    ],
+          return RefreshIndicator(
+            onRefresh: _refresh,
+            child: ListView.builder(
+              itemCount: _items.length,
+              itemBuilder: (context, i) {
+                final r = _items[i];
+                return Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  child: ListTile(
+                    title: Text(r.title),
+                    subtitle: Text('${r.categoryName ?? ''} • ${r.contentType}'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Switch(
+                          value: r.isPublished,
+                          onChanged: (val) => _togglePublish(r, val),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.edit),
+                          onPressed: () async {
+                            final changed = await Navigator.pushNamed(
+                              context,
+                              '/admin/resources/edit',
+                              arguments: r,
+                            );
+                            if (changed == true) await _refresh();
+                          },
+                        ),
+                        // Delete intentionally removed
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           );
         },
       ),

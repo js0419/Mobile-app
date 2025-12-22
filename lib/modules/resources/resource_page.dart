@@ -9,9 +9,9 @@ class ResourcesPage extends StatefulWidget {
 }
 
 class _ResourcesPageState extends State<ResourcesPage> {
-  int?  _selectedCategoryId;
+  int? _selectedCategoryId;
   String _search = '';
-  String?  _selectedTag;
+  String? _selectedTag;
   List<ResourceDto> _items = [];
   List<ResourceDto> _recent = [];
   List<Map<String, dynamic>> _categories = [];
@@ -68,7 +68,7 @@ class _ResourcesPageState extends State<ResourcesPage> {
 
   Future<void> _onFavoriteToggle(int id) async {
     final isFav = _favoriteIds.contains(id);
-    await ResourceService.toggleFavorite(id, ! isFav);
+    await ResourceService.toggleFavorite(id, !isFav);
     final refreshed = await ResourceService.fetchFavoriteIds();
     if (mounted) {
       setState(() {
@@ -99,19 +99,27 @@ class _ResourcesPageState extends State<ResourcesPage> {
       appBar: AppBar(
         title: const Text('Resources'),
         elevation: 0,
-        backgroundColor:  Colors.deepPurple,
+        backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.favorite),
+            onPressed: () {
+              Navigator.pushNamed(context, '/favorites');
+            },
+          ),
+        ],
       ),
       body: FutureBuilder(
         future: _loadFuture,
         builder: (context, snap) {
-          if (snap. connectionState == ConnectionState.waiting) {
+          if (snap.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
           if (snap.hasError) {
             return Center(
-              child:  Column(
-                mainAxisAlignment:  MainAxisAlignment.center,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(Icons.error_outline, size: 64, color: Colors.red),
                   const SizedBox(height: 16),
@@ -132,28 +140,18 @@ class _ResourcesPageState extends State<ResourcesPage> {
           return RefreshIndicator(
             onRefresh: _load,
             child: SingleChildScrollView(
-              child:  Column(
+              physics: const AlwaysScrollableScrollPhysics(), // ensure scroll
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Search Bar
                   _buildSearchBar(),
-
-                  // Category Chips
                   _buildCategoryChips(),
-
-                  // Tag Chips
                   _buildTagChips(),
-
-                  // Clear Filters Button
                   if (_selectedCategoryId != null ||
                       _selectedTag != null ||
                       _search.isNotEmpty)
                     _buildClearFiltersButton(),
-
-                  // Recently Viewed Section
                   _buildRecentSection(),
-
-                  // Main List
                   _buildListSection(),
                 ],
               ),
@@ -170,7 +168,7 @@ class _ResourcesPageState extends State<ResourcesPage> {
       child: TextField(
         controller: _searchController,
         decoration: InputDecoration(
-          hintText: 'Search resources.. .',
+          hintText: 'Search resources...',
           prefixIcon: const Icon(Icons.search),
           suffixIcon: _search.isNotEmpty
               ? IconButton(
@@ -183,13 +181,13 @@ class _ResourcesPageState extends State<ResourcesPage> {
           )
               : null,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius. circular(8),
+            borderRadius: BorderRadius.circular(8),
           ),
           filled: true,
           fillColor: Colors.grey[100],
         ),
         onChanged: (v) {
-          _search = v. trim();
+          _search = v.trim();
         },
         onSubmitted: (v) async {
           _search = v.trim();
@@ -200,36 +198,36 @@ class _ResourcesPageState extends State<ResourcesPage> {
   }
 
   Widget _buildCategoryChips() {
-    if (_categories.isEmpty) return const SizedBox. shrink();
+    if (_categories.isEmpty) return const SizedBox.shrink();
     return SizedBox(
       height: 52,
       child: ListView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          children: [
-      ChoiceChip(
-      label: const Text('All'),
-      selected: _selectedCategoryId == null,
-      onSelected: (_) async {
-        _selectedCategoryId = null;
-        await _load();
-      },
-    ),
-    ..._categories.map((c) => Padding(
-    padding: const EdgeInsets.only(left: 8),
-    child: ChoiceChip(
-    label: Text(c['name'] ?? ''),
-    selected:  _selectedCategoryId == c['category_id'],
-    onSelected: (_) async {
-    setState(() {
-    _selectedCategoryId = c['category_id'] as int;
-    });
-    await _load();
-    },
-    ),
-    )),
-    ],
-    ),
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        children: [
+          ChoiceChip(
+            label: const Text('All'),
+            selected: _selectedCategoryId == null,
+            onSelected: (_) async {
+              _selectedCategoryId = null;
+              await _load();
+            },
+          ),
+          ..._categories.map((c) => Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: ChoiceChip(
+              label: Text(c['name'] ?? ''),
+              selected: _selectedCategoryId == c['category_id'],
+              onSelected: (_) async {
+                setState(() {
+                  _selectedCategoryId = c['category_id'] as int;
+                });
+                await _load();
+              },
+            ),
+          )),
+        ],
+      ),
     );
   }
 
@@ -240,21 +238,21 @@ class _ResourcesPageState extends State<ResourcesPage> {
       height: 52,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical:  4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         children: [
           ChoiceChip(
             label: const Text('All Tags'),
             selected: _selectedTag == null,
-            onSelected:  (_) async {
+            onSelected: (_) async {
               _selectedTag = null;
               await _load();
             },
           ),
-          ... tags.map((t) => Padding(
+          ...tags.map((t) => Padding(
             padding: const EdgeInsets.only(left: 8),
             child: ChoiceChip(
               label: Text(t),
-              selected: _selectedTag?. toLowerCase() == t.toLowerCase(),
+              selected: _selectedTag?.toLowerCase() == t.toLowerCase(),
               onSelected: (_) async {
                 setState(() {
                   _selectedTag = t;
@@ -271,7 +269,7 @@ class _ResourcesPageState extends State<ResourcesPage> {
   Widget _buildClearFiltersButton() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: ElevatedButton. icon(
+      child: ElevatedButton.icon(
         icon: const Icon(Icons.clear_all),
         label: const Text('Clear Filters'),
         onPressed: _clearFilters,
@@ -280,7 +278,7 @@ class _ResourcesPageState extends State<ResourcesPage> {
   }
 
   Widget _buildRecentSection() {
-    if (_recent.isEmpty) return const SizedBox. shrink();
+    if (_recent.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -296,26 +294,26 @@ class _ResourcesPageState extends State<ResourcesPage> {
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            itemCount: _recent. length,
+            itemCount: _recent.length,
             itemBuilder: (context, i) {
               final r = _recent[i];
               return Container(
                 width: 220,
                 margin: const EdgeInsets.only(right: 12),
                 child: Card(
-                  elevation:  4,
+                  elevation: 4,
                   child: InkWell(
                     onTap: () {
                       Navigator.pushNamed(
                         context,
                         '/resource-detail',
-                        arguments: r. id,
+                        arguments: r.id,
                       );
                     },
-                    child:  Padding(
+                    child: Padding(
                       padding: const EdgeInsets.all(12),
                       child: Column(
-                        crossAxisAlignment:  CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             r.title,
@@ -325,12 +323,12 @@ class _ResourcesPageState extends State<ResourcesPage> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            r.summary ??  'No description',
+                            r.summary ?? 'No description',
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors. grey[600],
+                              color: Colors.grey[600],
                             ),
                           ),
                           const Spacer(),
@@ -339,7 +337,7 @@ class _ResourcesPageState extends State<ResourcesPage> {
                             children: [
                               Text(
                                 r.categoryName ?? 'Uncategorized',
-                                style:  const TextStyle(fontSize: 11),
+                                style: const TextStyle(fontSize: 11),
                               ),
                               Icon(
                                 _iconForType(r.contentType),
@@ -368,11 +366,11 @@ class _ResourcesPageState extends State<ResourcesPage> {
         child: Center(
           child: Column(
             children: [
-              Icon(Icons.search_off, size: 64, color:  Colors.grey[300]),
+              Icon(Icons.search_off, size: 64, color: Colors.grey[300]),
               const SizedBox(height: 16),
               Text(
                 'No resources found',
-                style:  TextStyle(color: Colors.grey[600]),
+                style: TextStyle(color: Colors.grey[600]),
               ),
               if (_search.isNotEmpty ||
                   _selectedTag != null ||
@@ -381,7 +379,7 @@ class _ResourcesPageState extends State<ResourcesPage> {
                   padding: const EdgeInsets.only(top: 16),
                   child: ElevatedButton(
                     onPressed: _clearFilters,
-                    child:  const Text('Clear Filters'),
+                    child: const Text('Clear Filters'),
                   ),
                 ),
             ],
@@ -413,12 +411,11 @@ class _ResourcesPageState extends State<ResourcesPage> {
             arguments: r.id,
           );
         },
-        child:  Padding(
+        child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment. start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Title and Favorite Icon
               Row(
                 children: [
                   Expanded(
@@ -434,8 +431,8 @@ class _ResourcesPageState extends State<ResourcesPage> {
                   ),
                   IconButton(
                     icon: Icon(
-                      isFav ?  Icons.favorite : Icons.favorite_border,
-                      color: isFav ?  Colors.red : null,
+                      isFav ? Icons.favorite : Icons.favorite_border,
+                      color: isFav ? Colors.red : null,
                     ),
                     onPressed: () => _onFavoriteToggle(r.id),
                     constraints: const BoxConstraints(),
@@ -444,8 +441,6 @@ class _ResourcesPageState extends State<ResourcesPage> {
                 ],
               ),
               const SizedBox(height: 8),
-
-              // Summary
               Text(
                 r.summary ?? 'No description',
                 maxLines: 2,
@@ -453,14 +448,12 @@ class _ResourcesPageState extends State<ResourcesPage> {
                 style: TextStyle(fontSize: 13, color: Colors.grey[700]),
               ),
               const SizedBox(height: 8),
-
-              // Category and Type Badge
               Row(
-                children:  [
+                children: [
                   if (r.categoryName != null)
                     Chip(
                       label: Text(
-                        r.categoryName! ,
+                        r.categoryName!,
                         style: const TextStyle(fontSize: 11),
                       ),
                       backgroundColor: Colors.deepPurple[100],
@@ -474,8 +467,8 @@ class _ResourcesPageState extends State<ResourcesPage> {
                       style: const TextStyle(fontSize: 11),
                     ),
                     backgroundColor: Colors.blue[100],
-                    padding:  const EdgeInsets.symmetric(horizontal: 8),
-                    labelPadding: EdgeInsets. zero,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    labelPadding: EdgeInsets.zero,
                     avatar: Icon(
                       _iconForType(r.contentType),
                       size: 14,
@@ -483,9 +476,7 @@ class _ResourcesPageState extends State<ResourcesPage> {
                   ),
                 ],
               ),
-              const SizedBox(height:  8),
-
-              // Tags
+              const SizedBox(height: 8),
               if (r.tags.isNotEmpty)
                 Wrap(
                   spacing: 4,
@@ -495,7 +486,7 @@ class _ResourcesPageState extends State<ResourcesPage> {
                         horizontal: 8,
                         vertical: 4,
                       ),
-                      decoration:  BoxDecoration(
+                      decoration: BoxDecoration(
                         color: Colors.grey[200],
                         borderRadius: BorderRadius.circular(12),
                       ),

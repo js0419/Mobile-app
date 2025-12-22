@@ -6,6 +6,10 @@ import '../modules/user/start_page.dart';
 class AdminDrawer extends StatelessWidget {
   const AdminDrawer({super.key});
 
+  void _go(BuildContext context, String route) {
+    Navigator.pushReplacementNamed(context, route);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Drawer(
@@ -37,6 +41,12 @@ class AdminDrawer extends StatelessWidget {
             onTap: () {
               Navigator.pushReplacementNamed(context, '/admin-dashboard');
             },
+          ),
+          ListTile(
+            leading: const Icon(Icons.library_books),
+            title: const Text('Manage Resources'),
+            subtitle: const Text('List, add, edit, publish/unpublish'),
+            onTap: () => _go(context, '/admin/resources'),
           ),
           ListTile(
             leading: const Icon(Icons.people),

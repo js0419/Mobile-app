@@ -37,6 +37,9 @@ dependencies:
   supabase_flutter: ^2.12.0
   image_picker: ^1.2.1
   path_provider: ^2.1.5
+  youtube_player_iframe: ^4.0.4
+  video_player: ^2.8.6
+  chewie: ^1.7.1
 
 dev_dependencies:
   flutter_test:

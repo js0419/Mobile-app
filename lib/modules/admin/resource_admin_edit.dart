@@ -16,7 +16,7 @@ class _ResourceAdminEditPageState extends State<ResourceAdminEditPage> {
   String _title = '';
   String? _summary;
   String _contentType = 'video';
-  String? _tags;
+  final Set<String> _selectedTags = {}; // article, exercise, music
   bool _isPublished = false;
 
   // Content fields
@@ -29,6 +29,11 @@ class _ResourceAdminEditPageState extends State<ResourceAdminEditPage> {
   String? _officeLocation;
   String? _officeHours;
 
+  bool _loading = true;
+  bool _saving = false;
+
+  static const List<String> _tagOptions = ['article', 'exercise', 'music'];
+
   @override
   void initState() {
     super.initState();
@@ -39,71 +44,171 @@ class _ResourceAdminEditPageState extends State<ResourceAdminEditPage> {
   }
 
   Future<void> _initForm() async {
-    _categories = await ResourceService.fetchCategories();
-    if (editing != null) {
-      _categoryId = editing!.categoryId;
-      _title = editing!.title;
-      _summary = editing!.summary;
-      _contentType = editing!.contentType;
-      _tags = editing!.tags.join(', ');
-      _isPublished = editing!.isPublished;
+    try {
+      _categories = await ResourceService.fetchCategories();
+      if (editing != null) {
+        _categoryId = editing!.categoryId;
+        _title = editing!.title;
+        _summary = editing!.summary;
+        _contentType = editing!.contentType;
+        _selectedTags
+          ..clear()
+          ..addAll(editing!.tags.where((t) => _tagOptions.contains(t)));
+        _isPublished = editing!.isPublished;
 
-      final c = editing!.content;
-      _videoUrl = c?.videoUrl;
-      _articleBody = c?.articleBody;
-      _externalLink = c?.externalLink;
-      _contactName = c?.contactName;
-      _contactEmail = c?.contactEmail;
-      _contactPhone = c?.contactPhone;
-      _officeLocation = c?.officeLocation;
-      _officeHours = c?.officeHours;
+        final c = editing!.content;
+        _videoUrl = c?.videoUrl;
+        _articleBody = c?.articleBody;
+        _externalLink = c?.externalLink;
+        _contactName = c?.contactName;
+        _contactEmail = c?.contactEmail;
+        _contactPhone = c?.contactPhone;
+        _officeLocation = c?.officeLocation;
+        _officeHours = c?.officeHours;
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
-    setState(() {});
+  }
+
+  void _clearContentFieldsForType(String type) {
+    setState(() {
+      switch (type) {
+        case 'video':
+          _articleBody = null;
+          _externalLink = null;
+          _contactName = _contactEmail = _contactPhone = _officeLocation = _officeHours = null;
+          break;
+        case 'article':
+          _videoUrl = null;
+          _externalLink = null;
+          _contactName = _contactEmail = _contactPhone = _officeLocation = _officeHours = null;
+          break;
+        case 'counselling':
+          _videoUrl = null;
+          _articleBody = null;
+          _externalLink = null;
+          break;
+        case 'link':
+        default:
+          _videoUrl = null;
+          _articleBody = null;
+          _contactName = _contactEmail = _contactPhone = _officeLocation = _officeHours = null;
+          break;
+      }
+    });
   }
 
   Future<void> _save() async {
+    if (_saving) return;
     if (!_formKey.currentState!.validate()) return;
     _formKey.currentState!.save();
 
-    final content = ResourceContent(
-      videoUrl: _videoUrl,
-      articleBody: _articleBody,
-      externalLink: _externalLink,
-      contactName: _contactName,
-      contactEmail: _contactEmail,
-      contactPhone: _contactPhone,
-      officeLocation: _officeLocation,
-      officeHours: _officeHours,
-    );
+    setState(() => _saving = true);
+    try {
+      // Clear irrelevant fields before sending
+      String? videoUrl = _videoUrl;
+      String? articleBody = _articleBody;
+      String? externalLink = _externalLink;
+      String? contactName = _contactName;
+      String? contactEmail = _contactEmail;
+      String? contactPhone = _contactPhone;
+      String? officeLocation = _officeLocation;
+      String? officeHours = _officeHours;
 
-    await ResourceService.upsertResource(
-      resourceId: editing?.id,
-      categoryId: _categoryId!,
-      title: _title,
-      summary: _summary,
-      contentType: _contentType,
-      tags: _tags?.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
-      isPublished: _isPublished,
-      content: content,
-    );
+      switch (_contentType) {
+        case 'video':
+          articleBody = null;
+          externalLink = null;
+          contactName = contactEmail = contactPhone = officeLocation = officeHours = null;
+          break;
+        case 'article':
+          videoUrl = null;
+          externalLink = null;
+          contactName = contactEmail = contactPhone = officeLocation = officeHours = null;
+          break;
+        case 'counselling':
+          videoUrl = null;
+          articleBody = null;
+          externalLink = null;
+          break;
+        case 'link':
+        default:
+          videoUrl = null;
+          articleBody = null;
+          contactName = contactEmail = contactPhone = officeLocation = officeHours = null;
+          break;
+      }
 
-    if (!mounted) return;
-    Navigator.pop(context);
+      final content = ResourceContent(
+        videoUrl: videoUrl,
+        articleBody: articleBody,
+        externalLink: externalLink,
+        contactName: contactName,
+        contactEmail: contactEmail,
+        contactPhone: contactPhone,
+        officeLocation: officeLocation,
+        officeHours: officeHours,
+      );
+
+      await ResourceService.upsertResource(
+        resourceId: editing?.id,
+        categoryId: _categoryId!,
+        title: _title,
+        summary: _summary,
+        contentType: _contentType,
+        tags: _selectedTags.toList(),
+        isPublished: _isPublished,
+        content: content,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Saved')),
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Save failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final savingIndicator = _saving
+        ? const Padding(
+      padding: EdgeInsets.only(right: 12),
+      child: SizedBox(
+        width: 18,
+        height: 18,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      ),
+    )
+        : const SizedBox.shrink();
+
     return Scaffold(
       appBar: AppBar(
         title: Text(editing == null ? 'Create Resource' : 'Edit Resource'),
         actions: [
+          savingIndicator,
           IconButton(
             icon: const Icon(Icons.save),
-            onPressed: _save,
+            onPressed: _saving ? null : _save,
           )
         ],
       ),
-      body: _categories.isEmpty && editing == null
+      body: _loading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -127,7 +232,8 @@ class _ResourceAdminEditPageState extends State<ResourceAdminEditPage> {
                 initialValue: _title,
                 decoration: const InputDecoration(labelText: 'Title'),
                 onSaved: (v) => _title = v?.trim() ?? '',
-                validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                validator: (v) =>
+                (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
               TextFormField(
                 initialValue: _summary,
@@ -144,12 +250,38 @@ class _ResourceAdminEditPageState extends State<ResourceAdminEditPage> {
                   DropdownMenuItem(value: 'counselling', child: Text('Counselling')),
                   DropdownMenuItem(value: 'link', child: Text('External Link')),
                 ],
-                onChanged: (v) => setState(() => _contentType = v ?? 'video'),
+                onChanged: (v) {
+                  final next = v ?? 'video';
+                  _contentType = next;
+                  _clearContentFieldsForType(next);
+                },
               ),
-              TextFormField(
-                initialValue: _tags,
-                decoration: const InputDecoration(labelText: 'Tags (comma separated)'),
-                onSaved: (v) => _tags = v?.trim(),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Tags',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+              Wrap(
+                spacing: 8,
+                children: _tagOptions.map((tag) {
+                  final selected = _selectedTags.contains(tag);
+                  return FilterChip(
+                    label: Text(tag),
+                    selected: selected,
+                    onSelected: (val) {
+                      setState(() {
+                        if (val) {
+                          _selectedTags.add(tag);
+                        } else {
+                          _selectedTags.remove(tag);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
               ),
               SwitchListTile(
                 title: const Text('Published'),
@@ -162,7 +294,7 @@ class _ResourceAdminEditPageState extends State<ResourceAdminEditPage> {
               ElevatedButton.icon(
                 icon: const Icon(Icons.save),
                 label: const Text('Save'),
-                onPressed: _save,
+                onPressed: _saving ? null : _save,
               ),
             ],
           ),
@@ -178,6 +310,10 @@ class _ResourceAdminEditPageState extends State<ResourceAdminEditPage> {
           initialValue: _videoUrl,
           decoration: const InputDecoration(labelText: 'Video URL'),
           onSaved: (v) => _videoUrl = v?.trim(),
+          validator: (v) =>
+          (_contentType == 'video' && (v == null || v.trim().isEmpty))
+              ? 'Video URL required'
+              : null,
         );
       case 'article':
         return TextFormField(
@@ -185,6 +321,10 @@ class _ResourceAdminEditPageState extends State<ResourceAdminEditPage> {
           decoration: const InputDecoration(labelText: 'Article Body'),
           maxLines: 6,
           onSaved: (v) => _articleBody = v?.trim(),
+          validator: (v) =>
+          (_contentType == 'article' && (v == null || v.trim().isEmpty))
+              ? 'Article body required'
+              : null,
         );
       case 'counselling':
         return Column(
@@ -221,6 +361,10 @@ class _ResourceAdminEditPageState extends State<ResourceAdminEditPage> {
           initialValue: _externalLink,
           decoration: const InputDecoration(labelText: 'External Link'),
           onSaved: (v) => _externalLink = v?.trim(),
+          validator: (v) =>
+          (_contentType == 'link' && (v == null || v.trim().isEmpty))
+              ? 'External link required'
+              : null,
         );
     }
   }

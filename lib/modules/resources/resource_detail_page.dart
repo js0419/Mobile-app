@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:video_player/video_player.dart';
+import 'package:chewie/chewie.dart';
 import '../../services/resource_service.dart';
 
 class ResourceDetailPage extends StatefulWidget {
@@ -10,9 +13,22 @@ class ResourceDetailPage extends StatefulWidget {
 }
 
 class _ResourceDetailPageState extends State<ResourceDetailPage> {
-  late Future<ResourceDto? > _future;
+  late Future<ResourceDto?> _future;
   bool _isFav = false;
   late int _resourceId;
+
+  YoutubePlayerController? _ytController;
+  VideoPlayerController? _videoController;
+  ChewieController? _chewieController;
+  YoutubeError? _ytError;
+
+  @override
+  void dispose() {
+    _ytController?.close();
+    _videoController?.dispose();
+    _chewieController?.dispose();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
@@ -69,9 +85,9 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<ResourceDto?>(
-      future:  _future,
+      future: _future,
       builder: (context, snap) {
-        if (snap. connectionState == ConnectionState.waiting) {
+        if (snap.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
@@ -79,23 +95,19 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
         if (snap.hasError) {
           return Scaffold(
             appBar: AppBar(title: const Text('Error')),
-            body: Center(
-              child: Text('Error:  ${snap.error}'),
-            ),
+            body: Center(child: Text('Error: ${snap.error}')),
           );
         }
         if (snap.data == null) {
           return Scaffold(
             appBar: AppBar(title: const Text('Resource')),
-            body: const Center(
-              child: Text('Resource not found'),
-            ),
+            body: const Center(child: Text('Resource not found')),
           );
         }
         final r = snap.data!;
         final c = r.content;
         return Scaffold(
-          appBar:  AppBar(
+          appBar: AppBar(
             title: Text(r.title, maxLines: 1, overflow: TextOverflow.ellipsis),
             backgroundColor: Colors.deepPurple,
             foregroundColor: Colors.white,
@@ -103,27 +115,25 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
               IconButton(
                 icon: Icon(
                   _isFav ? Icons.favorite : Icons.favorite_border,
-                  color:  _isFav ? Colors.red : Colors.white,
+                  color: _isFav ? Colors.red : Colors.white,
                 ),
                 onPressed: _toggleFav,
               ),
             ],
           ),
           body: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment. start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Title
                 Text(
                   r.title,
-                  style: Theme.of(context).textTheme.headlineSmall?. copyWith(
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height:  12),
-
-                // Category & Type Badge
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     if (r.categoryName != null)
@@ -143,11 +153,9 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
                   ],
                 ),
                 const SizedBox(height: 16),
-
-                // Summary
                 if (r.summary != null)
                   Column(
-                    crossAxisAlignment:  CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Summary',
@@ -160,11 +168,9 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
                       const SizedBox(height: 16),
                     ],
                   ),
-
-                // Content Section
                 if (c != null)
                   Column(
-                    crossAxisAlignment:  CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Divider(),
                       const SizedBox(height: 16),
@@ -175,29 +181,27 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      _buildContent(r. contentType, c),
+                      _buildContent(r.contentType, c),
                       const SizedBox(height: 16),
                     ],
                   ),
-
-                // Tags Section
                 if (r.tags.isNotEmpty)
                   Column(
-                    crossAxisAlignment:  CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Divider(),
                       const SizedBox(height: 16),
                       Text(
                         'Tags',
-                        style: Theme.of(context).textTheme.titleMedium?. copyWith(
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height:  8),
+                      const SizedBox(height: 8),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
-                        children: r. tags
+                        children: r.tags
                             .map((t) => Chip(
                           label: Text(t),
                           backgroundColor: Colors.grey[200],
@@ -217,7 +221,7 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
   Widget _buildContent(String type, ResourceContent c) {
     switch (type) {
       case 'video':
-        return _buildVideoContent(c);
+        return _buildInlineVideo(c);
       case 'article':
         return _buildArticleContent(c);
       case 'counselling':
@@ -227,50 +231,139 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
     }
   }
 
-  Widget _buildVideoContent(ResourceContent c) {
-    if (c.videoUrl == null || c.videoUrl!.isEmpty) {
+  Widget _buildInlineVideo(ResourceContent c) {
+    final url = c.videoUrl?.trim();
+    if (url == null || url.isEmpty) {
       return const Text('No video link available');
     }
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.blue[50],
+
+    final normalized = _normalizeUrl(url);
+
+    // YouTube embed
+    if (_isYouTube(normalized)) {
+      final videoId = YoutubePlayerController.convertUrlToId(normalized) ??
+          _extractYouTubeIdFromMaybeBare(normalized);
+      if (videoId == null) {
+        return _fallbackLaunch(normalized, 'Open video');
+      }
+      _ytController ??= YoutubePlayerController.fromVideoId(
+        videoId: videoId,
+        autoPlay: false,
+        params: const YoutubePlayerParams(showFullscreenButton: true),
+      )..listen((event) {
+        if (event.hasError) {
+          debugPrint('YouTube error: ${event.error}');
+          setState(() => _ytError = event.error);
+        }
+      });
+
+      if (_ytError != null) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('YouTube error: ${_ytError.toString()}'),
+            const SizedBox(height: 8),
+            _fallbackLaunch(normalized, 'Open video externally'),
+          ],
+        );
+      }
+
+      return ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.blue[200]! ),
-      ),
-      child: Column(
-        children: [
-          const Icon(Icons.play_circle_fill, size: 48, color: Colors.blue),
-          const SizedBox(height: 12),
-          ElevatedButton. icon(
-            icon: const Icon(Icons.open_in_new),
-            label: const Text('Watch Video'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors. white,
-            ),
-            onPressed: () => _launchUrl(c.videoUrl!),
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: YoutubePlayer(controller: _ytController!),
+        ),
+      );
+    }
+
+    // Direct link (mp4/hls/etc)
+    _videoController ??= VideoPlayerController.networkUrl(Uri.parse(normalized));
+    _chewieController ??= ChewieController(
+      videoPlayerController: _videoController!,
+      autoPlay: false,
+      looping: false,
+    );
+
+    return FutureBuilder(
+      future: _videoController!.initialize(),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 200,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snap.hasError) {
+          return _fallbackLaunch(normalized, 'Open video');
+        }
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: AspectRatio(
+            aspectRatio: _videoController!.value.aspectRatio,
+            child: Chewie(controller: _chewieController!),
           ),
-        ],
-      ),
+        );
+      },
+    );
+  }
+
+  String? _extractYouTubeIdFromMaybeBare(String url) {
+    final trimmed = url.trim();
+    if (!trimmed.contains('.') && trimmed.length >= 6 && trimmed.length <= 64) {
+      return trimmed;
+    }
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null) return null;
+
+    final v = uri.queryParameters['v'];
+    if (v != null && v.isNotEmpty) return v;
+
+    if (uri.host.contains('youtu.be') && uri.pathSegments.isNotEmpty) {
+      return uri.pathSegments.first;
+    }
+
+    final embedIdx = uri.pathSegments.indexOf('embed');
+    if (embedIdx != -1 && embedIdx + 1 < uri.pathSegments.length) {
+      return uri.pathSegments[embedIdx + 1];
+    }
+
+    final shortsIdx = uri.pathSegments.indexOf('shorts');
+    if (shortsIdx != -1 && shortsIdx + 1 < uri.pathSegments.length) {
+      return uri.pathSegments[shortsIdx + 1];
+    }
+
+    return null;
+  }
+
+  Widget _fallbackLaunch(String url, String label) {
+    return Column(
+      children: [
+        const Text('Inline playback unavailable.'),
+        const SizedBox(height: 8),
+        ElevatedButton.icon(
+          icon: const Icon(Icons.open_in_new),
+          label: Text(label),
+          onPressed: () => _launchUrl(url),
+        ),
+      ],
     );
   }
 
   Widget _buildArticleContent(ResourceContent c) {
-    if (c.articleBody == null || c.articleBody! .isEmpty) {
+    if (c.articleBody == null || c.articleBody!.isEmpty) {
       return const Text('No article content available');
     }
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets. all(12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.grey[50],
-        borderRadius:  BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.grey[300]!),
       ),
       child: Text(
-        c.articleBody! ,
+        c.articleBody!,
         style: const TextStyle(height: 1.6),
       ),
     );
@@ -278,56 +371,47 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
 
   Widget _buildCounsellingContent(ResourceContent c) {
     return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         if (c.contactName != null) ...[
-    _buildInfoRow(Icons.person, 'Counsellor', c.contactName!),
-    const SizedBox(height: 12),
-    ],
-    if (c.contactEmail != null) ...[
-    _buildLinkRow(
-    Icons.email,
-    'Email',
-    c.contactEmail!,
-    'mailto:${c.contactEmail}',
-    ),
-    const SizedBox(height: 12),
-    ],
-    if (c.contactPhone != null) ...[
-    _buildLinkRow(
-    Icons.phone,
-    'Phone',
-    c.contactPhone!,
-    'tel: ${c.contactPhone}',
-    ),
-    const SizedBox(height: 12),
-    ],
-    if (c.officeLocation != null) ...[
-    _buildInfoRow(Icons.location_on, 'Location', c.officeLocation!),
-    const SizedBox(height: 12),
-    ],
-    if (c.officeHours != null) ...[
-    _buildInfoRow(Icons.schedule, 'Hours', c.officeHours!),
-    ],
-    ],
+          _buildInfoRow(Icons.person, 'Counsellor', c.contactName!),
+          const SizedBox(height: 12),
+        ],
+        if (c.contactEmail != null) ...[
+          _buildLinkRow(Icons.email, 'Email', c.contactEmail!, 'mailto:${c.contactEmail}'),
+          const SizedBox(height: 12),
+        ],
+        if (c.contactPhone != null) ...[
+          _buildLinkRow(Icons.phone, 'Phone', c.contactPhone!, 'tel:${c.contactPhone}'),
+          const SizedBox(height: 12),
+        ],
+        if (c.officeLocation != null) ...[
+          _buildInfoRow(Icons.location_on, 'Location', c.officeLocation!),
+          const SizedBox(height: 12),
+        ],
+        if (c.officeHours != null) ...[
+          _buildInfoRow(Icons.schedule, 'Hours', c.officeHours!),
+        ],
+      ],
     );
   }
 
   Widget _buildExternalLinkContent(ResourceContent c) {
-    if (c.externalLink == null || c. externalLink!.isEmpty) {
+    if (c.externalLink == null || c.externalLink!.isEmpty) {
       return const Text('No external link available');
     }
+    final link = _normalizeUrl(c.externalLink!);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
       decoration: BoxDecoration(
         color: Colors.purple[50],
-        borderRadius:  BorderRadius.circular(8),
-        border: Border.all(color: Colors.purple[200]! ),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.purple[200]!),
       ),
       child: Column(
         children: [
-          const Icon(Icons.link, size: 48, color:  Colors.purple),
+          const Icon(Icons.link, size: 48, color: Colors.purple),
           const SizedBox(height: 12),
           ElevatedButton.icon(
             icon: const Icon(Icons.open_in_new),
@@ -336,7 +420,7 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
               backgroundColor: Colors.purple,
               foregroundColor: Colors.white,
             ),
-            onPressed: () => _launchUrl(c. externalLink!),
+            onPressed: () => _launchUrl(link),
           ),
         ],
       ),
@@ -357,7 +441,7 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
                 label,
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors. grey[600],
+                  color: Colors.grey[600],
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -370,12 +454,7 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
     );
   }
 
-  Widget _buildLinkRow(
-      IconData icon,
-      String label,
-      String value,
-      String url,
-      ) {
+  Widget _buildLinkRow(IconData icon, String label, String value, String url) {
     return InkWell(
       onTap: () => _launchUrl(url),
       child: Row(
@@ -414,15 +493,28 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
 
   Future<void> _launchUrl(String url) async {
     try {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
+      final normalized = _normalizeUrl(url);
+      final encoded = Uri.encodeFull(normalized);
+      final uri = Uri.tryParse(encoded);
+
+      if (uri == null || uri.host.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not open link')),
+            const SnackBar(content: Text('Invalid link')),
           );
         }
+        return;
+      }
+
+      final mode = (uri.host.contains('youtube.com') || uri.host.contains('youtu.be'))
+          ? LaunchMode.externalApplication
+          : LaunchMode.inAppBrowserView;
+
+      final ok = await launchUrl(uri, mode: mode);
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open link')),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -431,6 +523,25 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
         );
       }
     }
+  }
+
+  bool _isYouTube(String url) {
+    final lower = url.toLowerCase();
+    return lower.contains('youtube.com') || lower.contains('youtu.be');
+  }
+
+  String _normalizeUrl(String url) {
+    final trimmed = url.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    if (trimmed.startsWith('www.')) {
+      return 'https://$trimmed';
+    }
+    if (!trimmed.contains('.') && trimmed.length >= 6 && trimmed.length <= 64) {
+      return 'https://youtu.be/$trimmed';
+    }
+    return 'https://$trimmed';
   }
 
   IconData _iconForType(String t) {
