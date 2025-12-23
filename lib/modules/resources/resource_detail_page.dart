@@ -1,8 +1,9 @@
+import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:video_player/video_player.dart';
-import 'package:chewie/chewie.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+
 import '../../services/resource_service.dart';
 
 class ResourceDetailPage extends StatefulWidget {
@@ -14,21 +15,13 @@ class ResourceDetailPage extends StatefulWidget {
 
 class _ResourceDetailPageState extends State<ResourceDetailPage> {
   late Future<ResourceDto?> _future;
-  bool _isFav = false;
   late int _resourceId;
+  bool _isFav = false;
 
   YoutubePlayerController? _ytController;
   VideoPlayerController? _videoController;
   ChewieController? _chewieController;
-  YoutubeError? _ytError;
-
-  @override
-  void dispose() {
-    _ytController?.close();
-    _videoController?.dispose();
-    _chewieController?.dispose();
-    super.dispose();
-  }
+  String? _ytErrorText;
 
   @override
   void didChangeDependencies() {
@@ -37,21 +30,23 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
     _future = _load();
   }
 
+  @override
+  void dispose() {
+    _ytController?.dispose();
+    _chewieController?.dispose();
+    _videoController?.dispose();
+    super.dispose();
+  }
+
   Future<ResourceDto?> _load() async {
     try {
       final r = await ResourceService.fetchById(_resourceId);
-      if (r != null) {
-        await ResourceService.recordView(_resourceId);
-      }
+      if (r != null) await ResourceService.recordView(_resourceId);
       final favs = await ResourceService.fetchFavoriteIds();
-      if (mounted) {
-        setState(() {
-          _isFav = favs.contains(_resourceId);
-        });
-      }
+      if (mounted) setState(() => _isFav = favs.contains(_resourceId));
       return r;
     } catch (e) {
-      print('Error loading resource: $e');
+      debugPrint('Error loading resource: $e');
       return null;
     }
   }
@@ -61,11 +56,7 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
       await ResourceService.toggleFavorite(_resourceId, !_isFav);
       final favs = await ResourceService.fetchFavoriteIds();
       if (mounted) {
-        setState(() {
-          _isFav = favs.contains(_resourceId);
-        });
-      }
-      if (mounted) {
+        setState(() => _isFav = favs.contains(_resourceId));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_isFav ? 'Added to favorites' : 'Removed from favorites'),
@@ -75,9 +66,8 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -88,9 +78,7 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
       future: _future,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
         if (snap.hasError) {
           return Scaffold(
@@ -104,8 +92,10 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
             body: const Center(child: Text('Resource not found')),
           );
         }
+
         final r = snap.data!;
         final c = r.content;
+
         return Scaffold(
           appBar: AppBar(
             title: Text(r.title, maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -129,9 +119,10 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
               children: [
                 Text(
                   r.title,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -145,10 +136,7 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
                     Chip(
                       label: Text(r.contentType),
                       backgroundColor: Colors.blue[100],
-                      avatar: Icon(
-                        _iconForType(r.contentType),
-                        size: 16,
-                      ),
+                      avatar: Icon(_iconForType(r.contentType), size: 16),
                     ),
                   ],
                 ),
@@ -159,9 +147,10 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
                     children: [
                       Text(
                         'Summary',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
                       Text(r.summary!),
@@ -176,9 +165,10 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
                       const SizedBox(height: 16),
                       Text(
                         'Content',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 12),
                       _buildContent(r.contentType, c),
@@ -193,9 +183,10 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
                       const SizedBox(height: 16),
                       Text(
                         'Tags',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
                       Wrap(
@@ -222,8 +213,6 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
     switch (type) {
       case 'video':
         return _buildInlineVideo(c);
-      case 'article':
-        return _buildArticleContent(c);
       case 'counselling':
         return _buildCounsellingContent(c);
       default:
@@ -232,36 +221,37 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
   }
 
   Widget _buildInlineVideo(ResourceContent c) {
-    final url = c.videoUrl?.trim();
-    if (url == null || url.isEmpty) {
+    final raw = c.videoUrl?.trim();
+    if (raw == null || raw.isEmpty) {
       return const Text('No video link available');
     }
+    final normalized = _normalizeUrl(raw);
 
-    final normalized = _normalizeUrl(url);
-
-    // YouTube embed
-    if (_isYouTube(normalized)) {
-      final videoId = YoutubePlayerController.convertUrlToId(normalized) ??
-          _extractYouTubeIdFromMaybeBare(normalized);
-      if (videoId == null) {
-        return _fallbackLaunch(normalized, 'Open video');
-      }
-      _ytController ??= YoutubePlayerController.fromVideoId(
-        videoId: videoId,
-        autoPlay: false,
-        params: const YoutubePlayerParams(showFullscreenButton: true),
-      )..listen((event) {
-        if (event.hasError) {
-          debugPrint('YouTube error: ${event.error}');
-          setState(() => _ytError = event.error);
+    // YouTube
+    final ytId =
+        YoutubePlayer.convertUrlToId(normalized) ?? _extractYouTubeIdFromMaybeBare(normalized);
+    if (_isYouTube(normalized) && ytId != null) {
+      _ytController ??= YoutubePlayerController(
+        initialVideoId: ytId,
+        flags: const YoutubePlayerFlags(
+          autoPlay: false,
+          mute: false,
+          forceHD: false,
+          enableCaption: true,
+        ),
+      )..addListener(() {
+        final val = _ytController?.value;
+        if (val == null) return;
+        if (val.hasError) {
+          setState(() => _ytErrorText = val.errorCode.toString());
         }
       });
 
-      if (_ytError != null) {
+      if (_ytErrorText != null) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('YouTube error: ${_ytError.toString()}'),
+            Text('YouTube error: $_ytErrorText'),
             const SizedBox(height: 8),
             _fallbackLaunch(normalized, 'Open video externally'),
           ],
@@ -270,14 +260,15 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
 
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: AspectRatio(
-          aspectRatio: 16 / 9,
-          child: YoutubePlayer(controller: _ytController!),
+        child: YoutubePlayer(
+          controller: _ytController!,
+          showVideoProgressIndicator: true,
+          progressIndicatorColor: Colors.deepPurple,
         ),
       );
     }
 
-    // Direct link (mp4/hls/etc)
+    // Non-YouTube direct link
     _videoController ??= VideoPlayerController.networkUrl(Uri.parse(normalized));
     _chewieController ??= ChewieController(
       videoPlayerController: _videoController!,
@@ -318,26 +309,23 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
 
     final v = uri.queryParameters['v'];
     if (v != null && v.isNotEmpty) return v;
-
     if (uri.host.contains('youtu.be') && uri.pathSegments.isNotEmpty) {
       return uri.pathSegments.first;
     }
-
     final embedIdx = uri.pathSegments.indexOf('embed');
     if (embedIdx != -1 && embedIdx + 1 < uri.pathSegments.length) {
       return uri.pathSegments[embedIdx + 1];
     }
-
     final shortsIdx = uri.pathSegments.indexOf('shorts');
     if (shortsIdx != -1 && shortsIdx + 1 < uri.pathSegments.length) {
       return uri.pathSegments[shortsIdx + 1];
     }
-
     return null;
   }
 
   Widget _fallbackLaunch(String url, String label) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('Inline playback unavailable.'),
         const SizedBox(height: 8),
@@ -347,25 +335,6 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
           onPressed: () => _launchUrl(url),
         ),
       ],
-    );
-  }
-
-  Widget _buildArticleContent(ResourceContent c) {
-    if (c.articleBody == null || c.articleBody!.isEmpty) {
-      return const Text('No article content available');
-    }
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: Text(
-        c.articleBody!,
-        style: const TextStyle(height: 1.6),
-      ),
     );
   }
 
@@ -494,14 +463,12 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
   Future<void> _launchUrl(String url) async {
     try {
       final normalized = _normalizeUrl(url);
-      final encoded = Uri.encodeFull(normalized);
-      final uri = Uri.tryParse(encoded);
+      final uri = Uri.tryParse(normalized);
 
       if (uri == null || uri.host.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Invalid link')),
-          );
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('Invalid link')));
         }
         return;
       }
@@ -512,15 +479,13 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
 
       final ok = await launchUrl(uri, mode: mode);
       if (!ok && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open link')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Could not open link')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -548,8 +513,6 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
     switch (t) {
       case 'video':
         return Icons.play_circle_fill;
-      case 'article':
-        return Icons.article;
       case 'counselling':
         return Icons.support_agent;
       case 'external':
