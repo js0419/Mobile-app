@@ -21,6 +21,9 @@ class _ResourcesPageState extends State<ResourcesPage> {
 
   final _searchController = TextEditingController();
 
+  Color get _primaryGreen => Colors.green.shade600;
+  Color get _chipGreen => Colors.green.shade100;
+
   @override
   void initState() {
     super.initState();
@@ -55,7 +58,6 @@ class _ResourcesPageState extends State<ResourcesPage> {
         });
       }
     } catch (e) {
-      print('Error loading resources: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading resources: $e')),
@@ -99,7 +101,7 @@ class _ResourcesPageState extends State<ResourcesPage> {
       appBar: AppBar(
         title: const Text('Resources'),
         elevation: 0,
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: _primaryGreen,
         foregroundColor: Colors.white,
         actions: [
           IconButton(
@@ -126,6 +128,10 @@ class _ResourcesPageState extends State<ResourcesPage> {
                   const Text('Error loading resources'),
                   const SizedBox(height: 16),
                   ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _primaryGreen,
+                      foregroundColor: Colors.white,
+                    ),
                     onPressed: () {
                       setState(() {
                         _loadFuture = _load();
@@ -138,9 +144,10 @@ class _ResourcesPageState extends State<ResourcesPage> {
             );
           }
           return RefreshIndicator(
+            color: _primaryGreen,
             onRefresh: _load,
             child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(), // ensure scroll
+              physics: const AlwaysScrollableScrollPhysics(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -184,11 +191,9 @@ class _ResourcesPageState extends State<ResourcesPage> {
             borderRadius: BorderRadius.circular(8),
           ),
           filled: true,
-          fillColor: Colors.grey[100],
+          fillColor: Colors.green.shade50,
         ),
-        onChanged: (v) {
-          _search = v.trim();
-        },
+        onChanged: (v) => _search = v.trim(),
         onSubmitted: (v) async {
           _search = v.trim();
           await _load();
@@ -208,6 +213,7 @@ class _ResourcesPageState extends State<ResourcesPage> {
           ChoiceChip(
             label: const Text('All'),
             selected: _selectedCategoryId == null,
+            selectedColor: _chipGreen,
             onSelected: (_) async {
               _selectedCategoryId = null;
               await _load();
@@ -218,6 +224,7 @@ class _ResourcesPageState extends State<ResourcesPage> {
             child: ChoiceChip(
               label: Text(c['name'] ?? ''),
               selected: _selectedCategoryId == c['category_id'],
+              selectedColor: _chipGreen,
               onSelected: (_) async {
                 setState(() {
                   _selectedCategoryId = c['category_id'] as int;
@@ -243,6 +250,7 @@ class _ResourcesPageState extends State<ResourcesPage> {
           ChoiceChip(
             label: const Text('All Tags'),
             selected: _selectedTag == null,
+            selectedColor: _chipGreen,
             onSelected: (_) async {
               _selectedTag = null;
               await _load();
@@ -253,6 +261,7 @@ class _ResourcesPageState extends State<ResourcesPage> {
             child: ChoiceChip(
               label: Text(t),
               selected: _selectedTag?.toLowerCase() == t.toLowerCase(),
+              selectedColor: _chipGreen,
               onSelected: (_) async {
                 setState(() {
                   _selectedTag = t;
@@ -272,6 +281,10 @@ class _ResourcesPageState extends State<ResourcesPage> {
       child: ElevatedButton.icon(
         icon: const Icon(Icons.clear_all),
         label: const Text('Clear Filters'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _primaryGreen,
+          foregroundColor: Colors.white,
+        ),
         onPressed: _clearFilters,
       ),
     );
@@ -302,6 +315,7 @@ class _ResourcesPageState extends State<ResourcesPage> {
                 margin: const EdgeInsets.only(right: 12),
                 child: Card(
                   elevation: 4,
+                  shadowColor: _primaryGreen.withOpacity(0.2),
                   child: InkWell(
                     onTap: () {
                       Navigator.pushNamed(
@@ -342,6 +356,7 @@ class _ResourcesPageState extends State<ResourcesPage> {
                               Icon(
                                 _iconForType(r.contentType),
                                 size: 16,
+                                color: _primaryGreen,
                               ),
                             ],
                           ),
@@ -378,6 +393,10 @@ class _ResourcesPageState extends State<ResourcesPage> {
                 Padding(
                   padding: const EdgeInsets.only(top: 16),
                   child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _primaryGreen,
+                      foregroundColor: Colors.white,
+                    ),
                     onPressed: _clearFilters,
                     child: const Text('Clear Filters'),
                   ),
@@ -403,6 +422,7 @@ class _ResourcesPageState extends State<ResourcesPage> {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       elevation: 2,
+      shadowColor: _primaryGreen.withOpacity(0.15),
       child: InkWell(
         onTap: () {
           Navigator.pushNamed(
@@ -432,7 +452,7 @@ class _ResourcesPageState extends State<ResourcesPage> {
                   IconButton(
                     icon: Icon(
                       isFav ? Icons.favorite : Icons.favorite_border,
-                      color: isFav ? Colors.red : null,
+                      color: isFav ? Colors.red : _primaryGreen,
                     ),
                     onPressed: () => _onFavoriteToggle(r.id),
                     constraints: const BoxConstraints(),
@@ -456,7 +476,7 @@ class _ResourcesPageState extends State<ResourcesPage> {
                         r.categoryName!,
                         style: const TextStyle(fontSize: 11),
                       ),
-                      backgroundColor: Colors.deepPurple[100],
+                      backgroundColor: _chipGreen,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       labelPadding: EdgeInsets.zero,
                     ),
@@ -466,12 +486,13 @@ class _ResourcesPageState extends State<ResourcesPage> {
                       r.contentType,
                       style: const TextStyle(fontSize: 11),
                     ),
-                    backgroundColor: Colors.blue[100],
+                    backgroundColor: Colors.green.shade50,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     labelPadding: EdgeInsets.zero,
                     avatar: Icon(
                       _iconForType(r.contentType),
                       size: 14,
+                      color: _primaryGreen,
                     ),
                   ),
                 ],

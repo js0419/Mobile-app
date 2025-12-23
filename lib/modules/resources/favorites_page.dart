@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/resource_service.dart';
 
-class FavoritesPage extends StatefulWidget { // <-- renamed
+class FavoritesPage extends StatefulWidget {
   const FavoritesPage({super.key});
 
   @override
@@ -13,6 +13,9 @@ class _FavoritesPageState extends State<FavoritesPage> {
   List<ResourceDto> _items = [];
   Set<int> _favoriteIds = {};
   bool _isLoading = false;
+
+  Color get _primaryGreen => Colors.green.shade600;
+  Color get _chipGreen => Colors.green.shade100;
 
   @override
   void initState() {
@@ -62,7 +65,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Favorites'),
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: _primaryGreen,
         foregroundColor: Colors.white,
       ),
       body: FutureBuilder(
@@ -73,6 +76,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
           }
           if (_items.isEmpty) {
             return RefreshIndicator(
+              color: _primaryGreen,
               onRefresh: _load,
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -85,6 +89,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
             );
           }
           return RefreshIndicator(
+            color: _primaryGreen,
             onRefresh: _load,
             child: ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -105,6 +110,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       elevation: 2,
+      shadowColor: _primaryGreen.withOpacity(0.15),
       child: InkWell(
         onTap: () {
           Navigator.pushNamed(
@@ -134,7 +140,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
                   IconButton(
                     icon: Icon(
                       isFav ? Icons.favorite : Icons.favorite_border,
-                      color: isFav ? Colors.red : null,
+                      color: isFav ? Colors.red : _primaryGreen,
                     ),
                     onPressed: () => _onFavoriteToggle(r.id),
                     constraints: const BoxConstraints(),
@@ -158,7 +164,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
                         r.categoryName!,
                         style: const TextStyle(fontSize: 11),
                       ),
-                      backgroundColor: Colors.deepPurple[100],
+                      backgroundColor: _chipGreen,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       labelPadding: EdgeInsets.zero,
                     ),
@@ -168,12 +174,13 @@ class _FavoritesPageState extends State<FavoritesPage> {
                       r.contentType,
                       style: const TextStyle(fontSize: 11),
                     ),
-                    backgroundColor: Colors.blue[100],
+                    backgroundColor: Colors.green.shade50,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     labelPadding: EdgeInsets.zero,
                     avatar: Icon(
                       _iconForType(r.contentType),
                       size: 14,
+                      color: _primaryGreen,
                     ),
                   ),
                 ],
