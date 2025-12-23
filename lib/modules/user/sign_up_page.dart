@@ -30,15 +30,15 @@ class _SignUpPageState extends State<SignUpPage> {
     super.dispose();
   }
 
-  void _handleSignUp() async{
-    if (!_formKey.currentState!.validate()){
+  void _handleSignUp() async {
+    if (!_formKey.currentState!.validate()) {
       return;
     }
-    
-    if(!_agreeTerms){
+
+    if (!_agreeTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Please agree to the Terms & Conditions'),
+          content: Text('Please agree to the Terms & Conditions'),
         ),
       );
       return;
@@ -58,12 +58,24 @@ class _SignUpPageState extends State<SignUpPage> {
         const SnackBar(content: Text('Sign up successful')),
       );
 
-      Navigator.pop(context); // optional
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      Navigator.pop(context);
+    } on AuthException catch (e) {
+      if (e.message.toLowerCase().contains('already registered') ||
+          e.message.toLowerCase().contains('already exists')) {
+        _showError('This email is already registered. Please log in instead.');
+      } else {
+        _showError(e.message);
+      }
     }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
 
   @override

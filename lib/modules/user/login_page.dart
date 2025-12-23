@@ -40,27 +40,18 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-         MaterialPageRoute(builder: (BuildContext context) => const AuthWrapper()),
+
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (BuildContext context) => const AuthWrapper()),
       );
 
     } on AuthException catch (e) {
       await Supabase.instance.client.auth.signOut();
 
       if (e.message.toLowerCase().contains('invalid login credentials')) {
-        final data = await Supabase.instance.client
-            .from('user')
-            .select('user_email')
-            .eq('user_email', email)
-            .maybeSingle();
-
-        if (data == null) {
-          _showError('This email is not registered. Please sign up first.');
-        } else {
-          _showError(
-            'This email is linked to a Google account. Please sign in with Google.',
-          );
-        }
+        _showError('Invalid email or password.');
+      } else if (e.message.toLowerCase().contains('email not confirmed')) {
+        _showError('Please verify your email before logging in.');
       } else {
         _showError(e.message);
       }
@@ -116,8 +107,8 @@ class _LoginPageState extends State<LoginPage> {
                         children: [
                           const Text(
                             'Welcome Users'
-                            '\n'
-                            'Please log in to continue!',
+                                '\n'
+                                'Please log in to continue!',
                             style: TextStyle(fontSize: 15),
                           ),
                         ],

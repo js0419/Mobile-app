@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../modules/user/start_page.dart';
 import '../../modules/user/home_page.dart';
 import '../../modules/admin/admin_home.dart';
+import '../modules/moodRecords/mood_records_page.dart';
 import '../services/user_service.dart';
 import '../modules/admin/user_management.dart';
 import 'block_page.dart';
@@ -36,17 +37,21 @@ class AuthWrapper extends StatelessWidget {
               );
             }
 
-            final userType = snapshot.data!;
+            final result = snapshot.data!;
 
-            if (userType == 'staff') {
+            if (result == 'blocked') {
+              return const BlockPage();
+            }
+
+            if (result == 'staff') {
               return const UserManagementPage();
             }
 
-            if (userType == 'user') {
+            if (result == 'user') {
               return const HomePage();
             }
 
-            return const BlockPage();
+            return const StartPage();
           },
         );
       },
@@ -65,9 +70,13 @@ class AuthWrapper extends StatelessWidget {
 
     final data = await Supabase.instance.client
         .from('user')
-        .select('user_type')
+        .select('user_type, user_status')
         .eq('user_email', user.email!)
         .single();
+
+    if (data['user_status'] == false) {
+      return 'blocked';
+    }
 
     return data['user_type'] as String;
   }

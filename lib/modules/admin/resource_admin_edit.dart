@@ -15,14 +15,13 @@ class _ResourceAdminEditPageState extends State<ResourceAdminEditPage> {
   int? _categoryId;
   String _title = '';
   String? _summary;
-  String _contentType = 'video';
+  String _contentType = 'video'; // default
   final Set<String> _selectedTags = {}; // article, exercise, music
   bool _isPublished = false;
 
   // Content fields
   String? _videoUrl;
-  String? _articleBody;
-  String? _externalLink;
+  String? _articleBody; // retained for backward compatibility if ever present
   String? _contactName;
   String? _contactEmail;
   String? _contactPhone;
@@ -50,7 +49,11 @@ class _ResourceAdminEditPageState extends State<ResourceAdminEditPage> {
         _categoryId = editing!.categoryId;
         _title = editing!.title;
         _summary = editing!.summary;
-        _contentType = editing!.contentType;
+        // If existing content type was unsupported, coerce to video
+        _contentType = (editing!.contentType == 'counselling')
+            ? 'counselling'
+            : 'video';
+
         _selectedTags
           ..clear()
           ..addAll(editing!.tags.where((t) => _tagOptions.contains(t)));
@@ -58,8 +61,7 @@ class _ResourceAdminEditPageState extends State<ResourceAdminEditPage> {
 
         final c = editing!.content;
         _videoUrl = c?.videoUrl;
-        _articleBody = c?.articleBody;
-        _externalLink = c?.externalLink;
+        _articleBody = c?.articleBody; // will be ignored for non-article types
         _contactName = c?.contactName;
         _contactEmail = c?.contactEmail;
         _contactPhone = c?.contactPhone;
@@ -81,21 +83,14 @@ class _ResourceAdminEditPageState extends State<ResourceAdminEditPage> {
     setState(() {
       switch (type) {
         case 'video':
+        // keep video only
           _articleBody = null;
-          _externalLink = null;
-          _contactName = _contactEmail = _contactPhone = _officeLocation = _officeHours = null;
-          break;
-        case 'article':
-          _videoUrl = null;
-          _externalLink = null;
           _contactName = _contactEmail = _contactPhone = _officeLocation = _officeHours = null;
           break;
         case 'counselling':
           _videoUrl = null;
           _articleBody = null;
-          _externalLink = null;
           break;
-        case 'link':
         default:
           _videoUrl = null;
           _articleBody = null;
@@ -114,8 +109,7 @@ class _ResourceAdminEditPageState extends State<ResourceAdminEditPage> {
     try {
       // Clear irrelevant fields before sending
       String? videoUrl = _videoUrl;
-      String? articleBody = _articleBody;
-      String? externalLink = _externalLink;
+      String? articleBody = _articleBody; // will be nulled if non-article
       String? contactName = _contactName;
       String? contactEmail = _contactEmail;
       String? contactPhone = _contactPhone;
@@ -125,20 +119,12 @@ class _ResourceAdminEditPageState extends State<ResourceAdminEditPage> {
       switch (_contentType) {
         case 'video':
           articleBody = null;
-          externalLink = null;
-          contactName = contactEmail = contactPhone = officeLocation = officeHours = null;
-          break;
-        case 'article':
-          videoUrl = null;
-          externalLink = null;
           contactName = contactEmail = contactPhone = officeLocation = officeHours = null;
           break;
         case 'counselling':
           videoUrl = null;
           articleBody = null;
-          externalLink = null;
           break;
-        case 'link':
         default:
           videoUrl = null;
           articleBody = null;
@@ -149,7 +135,6 @@ class _ResourceAdminEditPageState extends State<ResourceAdminEditPage> {
       final content = ResourceContent(
         videoUrl: videoUrl,
         articleBody: articleBody,
-        externalLink: externalLink,
         contactName: contactName,
         contactEmail: contactEmail,
         contactPhone: contactPhone,
@@ -232,8 +217,7 @@ class _ResourceAdminEditPageState extends State<ResourceAdminEditPage> {
                 initialValue: _title,
                 decoration: const InputDecoration(labelText: 'Title'),
                 onSaved: (v) => _title = v?.trim() ?? '',
-                validator: (v) =>
-                (v == null || v.trim().isEmpty) ? 'Required' : null,
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
               TextFormField(
                 initialValue: _summary,
@@ -246,9 +230,7 @@ class _ResourceAdminEditPageState extends State<ResourceAdminEditPage> {
                 decoration: const InputDecoration(labelText: 'Content Type'),
                 items: const [
                   DropdownMenuItem(value: 'video', child: Text('Video')),
-                  DropdownMenuItem(value: 'article', child: Text('Article')),
                   DropdownMenuItem(value: 'counselling', child: Text('Counselling')),
-                  DropdownMenuItem(value: 'link', child: Text('External Link')),
                 ],
                 onChanged: (v) {
                   final next = v ?? 'video';
@@ -310,23 +292,12 @@ class _ResourceAdminEditPageState extends State<ResourceAdminEditPage> {
           initialValue: _videoUrl,
           decoration: const InputDecoration(labelText: 'Video URL'),
           onSaved: (v) => _videoUrl = v?.trim(),
-          validator: (v) =>
-          (_contentType == 'video' && (v == null || v.trim().isEmpty))
+          validator: (v) => (_contentType == 'video' && (v == null || v.trim().isEmpty))
               ? 'Video URL required'
               : null,
         );
-      case 'article':
-        return TextFormField(
-          initialValue: _articleBody,
-          decoration: const InputDecoration(labelText: 'Article Body'),
-          maxLines: 6,
-          onSaved: (v) => _articleBody = v?.trim(),
-          validator: (v) =>
-          (_contentType == 'article' && (v == null || v.trim().isEmpty))
-              ? 'Article body required'
-              : null,
-        );
       case 'counselling':
+      default:
         return Column(
           children: [
             TextFormField(
@@ -355,16 +326,6 @@ class _ResourceAdminEditPageState extends State<ResourceAdminEditPage> {
               onSaved: (v) => _officeHours = v?.trim(),
             ),
           ],
-        );
-      default: // link
-        return TextFormField(
-          initialValue: _externalLink,
-          decoration: const InputDecoration(labelText: 'External Link'),
-          onSaved: (v) => _externalLink = v?.trim(),
-          validator: (v) =>
-          (_contentType == 'link' && (v == null || v.trim().isEmpty))
-              ? 'External link required'
-              : null,
         );
     }
   }

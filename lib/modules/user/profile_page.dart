@@ -26,6 +26,43 @@ class _ProfilePageState extends State<ProfilePage> {
     _loadUserProfile();
   }
 
+  Future<bool?> showConfirmDialog({
+    required BuildContext context,
+    required String title,
+    required String message,
+  }) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        title: Row(
+          children: const [
+            Icon(Icons.logout, color: Colors.purple),
+            SizedBox(width: 8),
+            Text('Confirm Logout'),
+          ],
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.purple,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _loadUserProfile() async {
     try {
       final user = supabase.auth.currentUser;
@@ -183,7 +220,24 @@ class _ProfilePageState extends State<ProfilePage> {
                               'Logout',
                               style: TextStyle(color: Colors.red),
                             ),
-                            onTap: _logout,
+                            onTap: () async {
+                              final confirmed = await showConfirmDialog(
+                                context: context,
+                                title: 'Confirm Logout',
+                                message: 'Are you sure you want to log out?',
+                              );
+
+                              if (confirmed != true) return;
+
+                              await UserService.logout();
+
+                              if (!context.mounted) return;
+
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (BuildContext context) => const StartPage()),
+                              );
+                            },
                           ),
                         ],
                       ),
